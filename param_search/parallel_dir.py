@@ -3,8 +3,8 @@ import json
 from pathlib import Path
 import os
 import glob
-import pandas as pd
-import h5py
+#import pandas as pd
+#import h5py
 import csv
 import shutil
 
