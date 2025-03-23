@@ -52,6 +52,7 @@ def train(args, model, device, train_loader, optimizer, criterion, epoch):
                    epoch, i, len(train_loader), batch_time=batch_time,
                    data_time=data_time, loss=losses, top1=top1))
         iteration += 1
+    return losses.avg, top1.avg
 
 # Validation
 def validate(args, model, device, val_loader, criterion, iteration):

@@ -7,6 +7,7 @@ import datetime
 import os
 import random
 import time
+import datetime
 
 import torch
 import torchvision
@@ -67,11 +68,18 @@ def model_select(args):
 if __name__== "__main__":
 
     # Processing time
-    starttime = time.time()
+    starttime = time.perf_counter()
     
     # Option
     args = conf()
     print(args)
+
+    # Log file
+    logFileName = './log_pt_' + datetime.datetime.now().strftime('%y%m%d_%H%M%S') + '.csv'
+    with open(logFileName, 'w') as f:
+        f.write(str(args) + '\n')
+        f.write("epoch, loss, acc, duration\n")
+
 
     # GPUs
     use_cuda = not args.no_cuda and torch.cuda.is_available()
@@ -104,6 +112,7 @@ if __name__== "__main__":
     criterion = nn.CrossEntropyLoss().to(device)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30,60], gamma=0.1)
     
+
     # optionally resume from a checkpoint
     if args.resume:
         assert os.path.isfile(args.resume), "=> no checkpoint found at '{}'".format(args.resume)
@@ -117,12 +126,16 @@ if __name__== "__main__":
     if not args.no_multigpu:
         model = nn.DataParallel(model)
     
+    
+    args.log_interval = len(train_loader)/args.batch_size
     # FractalDB Pre-training
     iteration = (args.start_epoch-1)*len(train_loader)
     for epoch in range(args.start_epoch, args.epochs + 1):
-        train(args, model, device, train_loader, optimizer, criterion, epoch)
+        dur_start = time.perf_counter()
+        loss, acc = train(args, model, device, train_loader, optimizer, criterion, epoch)
         scheduler.step()
         iteration += len(train_loader)
+
         if args.val:
             validation_loss = validate(args, model, device, val_loader, criterion, iteration)
         if epoch % args.save_interval == 0:
@@ -138,9 +151,16 @@ if __name__== "__main__":
                         'optimizer' : optimizer.state_dict(),
                         'scheduler' : scheduler.state_dict(),}, checkpoint)
             model = model.to(device)
+        dur_epoch = time.perf_counter() - dur_start
+        print("Duration of Epoch:{0:03d}::{1:.3f} sec".format(epoch, dur_epoch))
+        with open(logFileName, 'a') as f:
+           f.write("{}, {}, {}, {}\n".format((epoch - 1), loss, acc, dur_epoch))
+
     torch.save(model_state, saved_weight.replace('.tar',''))
 
     # Processing time
-    endtime = time.time()
+    endtime = time.perf_counter()
     interval = endtime - starttime
     print("elapsed time = {0:d}h {1:d}m {2:d}s".format(int(interval/3600), int((interval%3600)/60), int((interval%3600)%60)))
+    with open(logFileName, 'a') as f:
+        f.write("elapsed time = {0:d}h {1:d}m {2:d}s".format(int(interval/3600), int((interval%3600)/60), int((interval%3600)%60)))
