@@ -110,7 +110,7 @@ if __name__== "__main__":
     model = model_select(args)
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum,weight_decay=args.weight_decay)
     criterion = nn.CrossEntropyLoss().to(device)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30,60], gamma=0.1)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30,60,90,120,150], gamma=0.1)
     
 
     # optionally resume from a checkpoint
@@ -142,7 +142,7 @@ if __name__== "__main__":
             if args.no_multigpu:
                 model_state = model.cpu().state_dict()
             else:
-                model_state = model.module.cpu().state_dict()            
+                model_state = model.module.cpu().state_dict()
             saved_weight = "{}/{}_{}_epoch{}.pth.tar".format(args.path2weight, args.dataset, args.usenet, epoch)
             torch.save(model_state, saved_weight.replace('.tar',''))
             checkpoint = "{}/{}_{}_checkpoint.pth.tar".format(args.path2weight, args.dataset, args.usenet)
@@ -152,7 +152,7 @@ if __name__== "__main__":
                         'scheduler' : scheduler.state_dict(),}, checkpoint)
             model = model.to(device)
         dur_epoch = time.perf_counter() - dur_start
-        print("Duration of Epoch:{0:03d}::{1:.3f} sec".format(epoch, dur_epoch))
+        print("Epoch:{:03d}\t loss:{:.3f}\t acc:{:.3f}\t lr:{}  in {:.3f} sec".format(epoch, loss, acc, optimizer.param_groups[0]['lr'], dur_epoch))
         with open(logFileName, 'a') as f:
            f.write("{}, {}, {}, {}\n".format((epoch - 1), loss, acc, dur_epoch))
 

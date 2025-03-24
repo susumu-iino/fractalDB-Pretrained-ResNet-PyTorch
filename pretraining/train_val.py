@@ -6,6 +6,7 @@ Created on Sat Aug 05 23:55:12 2018
 
 import time
 import torch
+import tqdm
 
 # Training
 def train(args, model, device, train_loader, optimizer, criterion, epoch):
@@ -18,8 +19,9 @@ def train(args, model, device, train_loader, optimizer, criterion, epoch):
     # switch to train mode
     model.train()
     end = time.time()
-    for i, (data, target) in enumerate(train_loader):
-
+    str_epoch = 'Epoch:{:03d}'.format(epoch)
+    #for i, (data, target) in enumerate(train_loader):
+    for i, (data, target) in enumerate(tqdm.tqdm(train_loader, desc=str_epoch, total=len(train_loader))):
         # measure data loading time
         data_time.update(time.time() - end)
         data, target = data.to(device), target.to(device)
@@ -43,6 +45,7 @@ def train(args, model, device, train_loader, optimizer, criterion, epoch):
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
+        '''
         if i % args.log_interval == 0:
             print('Epoch: [{0}][{1}/{2}]\t'
                   'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
@@ -52,6 +55,7 @@ def train(args, model, device, train_loader, optimizer, criterion, epoch):
                    epoch, i, len(train_loader), batch_time=batch_time,
                    data_time=data_time, loss=losses, top1=top1))
         iteration += 1
+        '''
     return losses.avg, top1.avg
 
 # Validation
