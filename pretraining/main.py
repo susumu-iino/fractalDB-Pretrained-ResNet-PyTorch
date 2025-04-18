@@ -78,7 +78,10 @@ if __name__== "__main__":
     logFileName = './log_pt_' + datetime.datetime.now().strftime('%y%m%d_%H%M%S') + '.csv'
     with open(logFileName, 'w') as f:
         f.write(str(args) + '\n')
-        f.write("epoch, loss, acc, duration\n")
+        if args.val:
+            f.write("epoch, loss, acc, val_loss, val_acc, duration\n")
+        else:
+            f.write("epoch, loss, acc, duration\n")
 
 
     # GPUs
@@ -137,7 +140,7 @@ if __name__== "__main__":
         iteration += len(train_loader)
 
         if args.val:
-            validation_loss = validate(args, model, device, val_loader, criterion, iteration)
+            validation_loss, validation_acc = validate(args, model, device, val_loader, criterion, iteration)
         if epoch % args.save_interval == 0:
             if args.no_multigpu:
                 model_state = model.cpu().state_dict()
@@ -152,9 +155,13 @@ if __name__== "__main__":
                         'scheduler' : scheduler.state_dict(),}, checkpoint)
             model = model.to(device)
         dur_epoch = time.perf_counter() - dur_start
-        print("Epoch:{:03d}\t loss:{:.3f}\t acc:{:.3f}\t lr:{}  in {:.3f} sec".format(epoch, loss, acc, optimizer.param_groups[0]['lr'], dur_epoch))
         with open(logFileName, 'a') as f:
-           f.write("{}, {}, {}, {}\n".format((epoch - 1), loss, acc, dur_epoch))
+           if args.val:
+               print("Epoch:{:03d}\t loss:{:.3f}\t acc:{:.3f}\t val_loss:{:.3f}\t val_acc:{:.3f}\t lr:{} in {:.3f} sec".format(epoch, loss, acc, validation_loss, validation_acc, optimizer.param_groups[0]['lr'], dur_epoch))
+               f.write("{}, {}, {}, {}, {}, {}\n".format((epoch - 1), loss, acc, validation_loss, validation_acc, dur_epoch))
+           else:
+               print("Epoch:{:03d}\t loss:{:.3f}\t acc:{:.3f}\t lr:{}  in {:.3f} sec".format(epoch, loss, acc, optimizer.param_groups[0]['lr'], dur_epoch))
+               f.write("{}, {}, {}, {}\n".format((epoch - 1), loss, acc, dur_epoch))
 
     torch.save(model_state, saved_weight.replace('.tar',''))
 
