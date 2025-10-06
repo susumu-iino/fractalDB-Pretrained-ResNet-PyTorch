@@ -34,9 +34,10 @@ def getAffineSVD(theta, phi, singMat):
    U, s, V = np.linalg.svd(affine, full_matrices=True)
    print('affine::{}'.format(affine))
    print('leftSingularVector::{}'.format(U))
+   print('singularMat::{}'.format(s))
    print('rightSingularVector::{}'.format(V))
-   print('theta:{}'.format(math.atan2(U[1, 0], U[0, 0])*360/2.0/math.pi))
-   print('phi:{}'.format(math.atan2(V[1, 0], V[0, 0])*360/2.0/math.pi))
+   print('theta:{}'.format(math.atan2(U[1, 0], U[0, 0])*360.0/2.0/math.pi))
+   print('phi:{}'.format(math.atan2(V[1, 0], V[0, 0])*360.0/2.0/math.pi))
    
    return affine
 
@@ -52,7 +53,8 @@ thetas_default = [-144.0, -120.0, -96.0, -72.0, -48.0, -24.0, 0.0, 24.0, 48.0, 7
 ef_default = [-3.0, -2.5, -2.0, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
 
 #sigList = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-sigList = [0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95]
+#sigList = [0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95]
+sigList = [0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90]
 
 
 used = []
@@ -84,7 +86,7 @@ def sample_systemGrid(affineNum=4, targetSigma=4.7, sigList=sigList, thetas=thet
            if sampledSigs in used:
                singList  = []
                continue
-           elif sigmaFactor !=  targetSigma:
+           elif abs( sigmaFactor - targetSigma ) > 0.01:
                singList  = []
                continue
            else:
@@ -93,6 +95,7 @@ def sample_systemGrid(affineNum=4, targetSigma=4.7, sigList=sigList, thetas=thet
                phiList   = random.sample(phis,       k=affineNum)
                eList     = random.sample(ef_default, k=affineNum)
                fList     = random.sample(ef_default, k=affineNum)
+               print('passed sigmaFactor constrained!!')
                break
 
         for i in range(affineNum):
@@ -128,16 +131,14 @@ def conf():
 	parser.add_argument('--fillrate_min',type = float,default=0.05)
 	parser.add_argument('--fillrate_max',type = float,default=1.0)
 	parser.add_argument('--offset_cid',  type = int,  default=0)
+	parser.add_argument('--seed',        type = int,  default=42)
 	args = parser.parse_args()
 	return args
 
 
 if __name__ == "__main__":
 
-    #乱数初期化
-    rng = np.random.default_rng(seed=42)
-    random.seed(42)
-    
+
     #引数解釈
     args = conf()
     
@@ -150,6 +151,7 @@ if __name__ == "__main__":
     fillrateMin  = args.fillrate_min
     fillrateMax  = args.fillrate_max
     offset_cid   = args.offset_cid
+    seed         = args.seed
 
     #辞書の用意：実験条件の保存
     fractalParamsDict = OrderedDict()
@@ -160,7 +162,13 @@ if __name__ == "__main__":
     fractalParamsDict['sigma_factor'] = sigma_factor
     fractalParamsDict['fillrateMin']  = fillrateMin
     fractalParamsDict['fillrateMax']  = fillrateMax
+    fractalParamsDict['seed']         = seed
     fractalParamsDict['classes']      = OrderedDict()
+    
+    #乱数初期化
+    rng = np.random.default_rng(seed=seed)
+    random.seed(seed)
+    
 
     savedir_img = os.path.join(save_dir, 'classImgs')
     os.makedirs(savedir_img,   exist_ok=True)
