@@ -16,7 +16,14 @@ import torch.optim as optim
 import torch.backends.cudnn as cudnn
 import torchvision.models as models
 import torchvision.datasets as datasets
-import torchvision.transforms as transforms
+#import torchvision.transforms as transforms
+import torchvision.transforms.v2 as transforms
+
+from torchvision.i import read_image
+
+import timm.loss
+import timm.data.mixup
+import timm.scheduler
 
 from args import conf
 from alex import bn_alexnet
@@ -95,8 +102,60 @@ if __name__== "__main__":
     
     # Training settings
     normalize = transforms.Normalize(mean=[0.2, 0.2, 0.2], std=[0.5, 0.5, 0.5])
-    train_transform = transforms.Compose([transforms.RandomCrop((args.crop_size,args.crop_size)),
-                                        transforms.ToTensor(), normalize])
+    #train_transform = transforms.Compose([transforms.RandomCrop((args.crop_size,args.crop_size)), transforms.ToTensor(), normalize])
+    '''
+    train_transform = transforms.Compose([
+                         transforms.RandomResizeCrop(size=(args.crop_size,args.crop_size), scale=(0.08, 1.0), ratio=(0.75, 1.3333), interpolation=torchvision.transforms.InterpolationMode.BICUBIC),
+                         transforms.RandomApply([transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 2.0))], p=0.3),
+                         transforms.RandomHorizontalFlip(p=0.5),
+                         transforms.RandomVerticalFlip(p=0.5),
+                         transforms.ToTensor(),
+                         normalize,
+                         transforms.RandomErasing(p=0.5, value='random'),
+                         ])
+    '''
+    '''
+    train_transform = nn.Sequential(
+                         transforms.RandomCrop((args.crop_size,args.crop_size)),
+                         transforms.RandomApply([transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 3.0))], p=0.5),
+                         transforms.RandomHorizontalFlip(p=0.5),
+                         transforms.RandomVerticalFlip(p=0.5),
+                         transforms.CovertImageDtype(torch.float32),
+                         normalize,
+                         transforms.RandomErasing(p=0.5, value='random'),
+                         ).to(torch.device(device))
+    '''
+    train_transform = timm.data.create_tranform(
+                       input_size=(args.crop_size, args.crop_size),
+                       is_training=True,
+                       use_prefetcher=False,
+                       no_aug=False,
+                       scale=(0.08, 1.0),
+                       ratio=(0.75, 1.3333333),
+                       hflip=0.5,
+                       vflip=0.5,
+                       color_jitter=0.4,
+                       auto_augment='rand-m9-mstd0.5-inc1',
+                       interpolation=transforms.InterpolationMode.BICUBIC,
+                       mean=[0.2, 0.2, 0.2],
+                       std=[0.5, 0.5, 0.5],
+                       re_prob=0.5,
+                       re_mode='pixel',
+                       re_count=1,
+                     )
+    print('Augmentations are as follows:')
+    for tf in train_transform.transforms:
+        print('{}\n'.format(tf.__call__))
+
+
+    def target_to_oh(target):
+         NUM_CLASS = args.numof_classes
+         one_hot = [0] * NUM_CLASS
+         one_hot[target] = 1.0
+         return torch.tensor(one_hot, dtype=torch.float32)
+
+
+
     train_dataset = datasets.ImageFolder(args.path2traindb, transform=train_transform)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True,
                                              num_workers=args.num_workers, pin_memory=True, drop_last=True, worker_init_fn=worker_init_fn)
@@ -104,16 +163,30 @@ if __name__== "__main__":
     # Basically, the FractalDB pre-training doesn't require validation phase
     if args.val:
         val_transform = transforms.Compose([transforms.Resize((args.crop_size,args.crop_size), interpolation=2),
-                                         transforms.ToTensor(), normalize])
+                                            transforms.ToTensor(), normalize])
         val_dataset = datasets.ImageFolder(args.path2valdb, transform=val_transform)
         val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False,
                                                  num_workers=args.num_workers, pin_memory=True, drop_last=False, worker_init_fn=worker_init_fn)
+
+    # Mixup Setting
+    mixup_args = {
+               'mixup_alpha': 0.8,
+               'cutmix_alpha': 1.0,
+               'prob': 1.0,
+               'switch_prob': 0.5,
+               'mode': 'batch',
+               'label_smoothing': 0.1
+             }
+    mixup_fn = timm.data.mixup.Mixup(**mixup_args)
+    #mixup_fn  = None
+
 
     # Model & optimizer
     model = model_select(args)
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum,weight_decay=args.weight_decay)
     criterion = nn.CrossEntropyLoss().to(device)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30,60,90,120,150], gamma=0.1)
+    criterion  = timm.loss.SoftTargetCrossEntropy().cuda()
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30,60,90,120], gamma=0.1)
     
 
     # optionally resume from a checkpoint
@@ -135,7 +208,7 @@ if __name__== "__main__":
     iteration = (args.start_epoch-1)*len(train_loader)
     for epoch in range(args.start_epoch, args.epochs + 1):
         dur_start = time.perf_counter()
-        loss, acc = train(args, model, device, train_loader, optimizer, criterion, epoch)
+        loss, acc = train(args, model, device, train_loader, optimizer, criterion, epoch, mixup_fn)
         scheduler.step()
         iteration += len(train_loader)
 

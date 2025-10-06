@@ -9,7 +9,7 @@ import torch
 import tqdm
 
 # Training
-def train(args, model, device, train_loader, optimizer, criterion, epoch):
+def train(args, model, device, train_loader, optimizer, criterion, epoch, mixup_fn=None):
     iteration = (epoch-1)*len(train_loader)
     batch_time = AverageMeter()
     data_time = AverageMeter()
@@ -25,6 +25,9 @@ def train(args, model, device, train_loader, optimizer, criterion, epoch):
         # measure data loading time
         data_time.update(time.time() - end)
         data, target = data.to(device), target.to(device)
+
+        if mixup_fn is not None:
+           target, target = mixup_fn(data, target)
 
         # compute output
         output = model(data)
