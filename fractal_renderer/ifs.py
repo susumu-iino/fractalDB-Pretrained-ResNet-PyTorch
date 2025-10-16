@@ -3,6 +3,7 @@ from functools import partial
 from cv2 import cvtColor, COLOR_HSV2RGB
 import numba
 import numpy as np
+import math
 
 
 def sample_svs(n, a, rng=None):
@@ -191,6 +192,16 @@ def iterate(sys, n_iter, rng_list, ps=None):
         coords[i] = x, y
         if not np.isfinite(x) or not np.isfinite(y): break  # if contractivity is satisfied, can remove this check
     return coords
+
+@numba.njit(cache=True)
+def rotatePoints(points, rot):
+    coords = np.empty((len(points), 2))
+    #rotMat = np.array([[math.cos(rot), -math.sin(rot)], [math.sin(rot), math.cos(rot)]])
+    for i in range(len(points)):
+       coords[i, 0] = points[i, 0] * math.cos(rot) - points[i, 1] * math.sin(rot)
+       coords[i, 1] = points[i, 0] * math.sin(rot) + points[i, 1] * math.cos(rot)
+    return coords
+
 
 
 @numba.njit(cache=True)
@@ -397,6 +408,7 @@ def _hsv_colorize(rendered, min_sat=0.3, min_val=0.5):
     hue_shift = np.random.rand() * 255
     sat = np.uint8(np.random.uniform(min_sat, 1) * 255)
     val = np.uint8(np.random.uniform(min_val, 1) * 255)
+    
 
     for i in range(h):
         for j in range(w):

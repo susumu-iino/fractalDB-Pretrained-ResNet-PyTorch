@@ -45,6 +45,8 @@ def getAffineSVD(theta, phi, singMat):
    
    return affine
 
+
+
 def conf():
     parser = argparse.ArgumentParser()
     parser.add_argument('--saved_systems', type=str,   required = True)
@@ -85,7 +87,8 @@ if __name__ == "__main__":
     #辞書の用意：実験条件の保存
     instanceParamsDict = OrderedDict()
     instanceParamsDict['num_classes']   = classesParams['num_classes']
-    instanceParamsDict['num_instances'] = num_perturbations * num_patch_aug * (4 if flip_aug else 1) 
+    #instanceParamsDict['num_instances'] = num_perturbations * num_patch_aug * (4 if flip_aug else 1) 
+    instanceParamsDict['num_instances'] = num_perturbations * 3
     instanceParamsDict['numof_points']  = numofPoints
     instanceParamsDict['img_size']      = img_size
     instanceParamsDict['img_type']      = args.img_type
@@ -124,6 +127,7 @@ if __name__ == "__main__":
     #クラス毎Fractalパラメータの読み出し
     systems_dict = classesParams['classes']
 
+    rots = [0, 2, 4]
     
     for cls, params in tqdm.tqdm(systems_dict.items()):
     
@@ -143,19 +147,25 @@ if __name__ == "__main__":
            for i, spectalParam in enumerate(spectral):
                instanceSpectral       = np.array(spectalParam) + instancdePerturb
                sigMat                 = np.array([ [instanceSpectral[0], 0.0], [0.0, instanceSpectral[1]]])
-               affine                 = getAffineSVD(instanceSpectral[2], instanceSpectral[3], sigMat)
-               fractalParams[i, 0, :] = [affine[0, 0], affine[0, 1], instanceSpectral[4]]
-               fractalParams[i, 1, :] = [affine[1, 0], affine[1, 1], instanceSpectral[5]]
-               
+               theta, phi, e, f       = instanceSpectral[2], instanceSpectral[3], instanceSpectral[4], instanceSpectral[5]
+               affine                 = getAffineSVD((theta * 2.0 * math.pi/360.0), (phi * 2.0 * math.pi/360.0), sigMat)
                a, b, c, d             = affine.transpose().ravel()
-               system.append([a, b, c, d, instanceSpectral[4], instanceSpectral[5]])
+               fractalParams[i, 0, :] = [a, c, e]
+               fractalParams[i, 1, :] = [b, d, f]
+
+               system.append([a, b, c, d, e, f])
                perturbatedSpectral.append(instanceSpectral.tolist())
                
            #ifsから画像生成
            points     = ifs.iterate(fractalParams, numofPoints, rng_list=rng.random(numofPoints), ps=None)
-           gray_image = ifs.render(points, s=img_size, binary=True)
-           gray_image = ((gray_image/gray_image.max())*128).astype('uint8')
-           cv2.imwrite(os.path.join(savedir_cls, (instanceName + '.png')), gray_image)
+           for rot in rots:
+              strRot = ('%02d' % rot)
+              points = ifs.rotatePoints(points, (rot * 2.0 * math.pi/360.0))
+              gray_image = ifs.render(points, s=img_size, binary=True)
+              gray_image = ((gray_image/gray_image.max())*128).astype('uint8')
+              image      = ifs.colorize(gray_image)
+              #cv2.imwrite(os.path.join(savedir_cls, (instanceName + '_' + strRot +'.png')), gray_image)
+              cv2.imwrite(os.path.join(savedir_cls, (instanceName + '_' + strRot +'.png')), image)
            
            instanceParamsDict['instances'][instanceName]             = OrderedDict()
            instanceParamsDict['instances'][instanceName]['system']   = system

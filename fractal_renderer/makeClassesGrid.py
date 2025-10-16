@@ -106,7 +106,7 @@ def sample_systemGrid(affineNum=4, targetSigma=4.7, sigList=sigList, thetas=thet
            f     = fList[i]
 
            singMat    = np.array([[singL, 0.0], [0.0, singS]])
-           affine     = getAffineSVD(theta, phi, singMat)
+           affine     = getAffineSVD((theta * 2.0* math.pi/360.0), (phi * 2.0 * math.pi/360.0), singMat)
            a, b, c, d = affine.transpose().ravel()
            p          = abs(singL * singS)
            systemParams.append([a, b, c, d, e, f, p])
