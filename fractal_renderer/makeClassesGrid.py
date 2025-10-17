@@ -95,7 +95,7 @@ def sample_systemGrid(affineNum=4, targetSigma=4.7, sigList=sigList, thetas=thet
                phiList   = random.sample(phis,       k=affineNum)
                eList     = random.sample(ef_default, k=affineNum)
                fList     = random.sample(ef_default, k=affineNum)
-               print('passed sigmaFactor constrained!!')
+               #print('passed sigmaFactor constrained!!')
                break
 
         for i in range(affineNum):
@@ -106,7 +106,7 @@ def sample_systemGrid(affineNum=4, targetSigma=4.7, sigList=sigList, thetas=thet
            f     = fList[i]
 
            singMat    = np.array([[singL, 0.0], [0.0, singS]])
-           affine     = getAffineSVD((theta * 2.0* math.pi/360.0), (phi * 2.0 * math.pi/360.0), singMat)
+           affine     = getAffineSVD((theta * math.pi/180.0), (phi * math.pi/180.0), singMat)
            a, b, c, d = affine.transpose().ravel()
            p          = abs(singL * singS)
            systemParams.append([a, b, c, d, e, f, p])

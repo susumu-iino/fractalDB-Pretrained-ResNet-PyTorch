@@ -21,6 +21,10 @@ import tqdm
 
 import ifs
 
+H_BASE_MAX = 220
+S_BASE_MAX = 200
+V_BASE_MAX = 200
+
 #a > bを保証する
 def sortPair(a, b):
    tmp = a
@@ -53,6 +57,7 @@ def conf():
     parser.add_argument('--num_perturbations', type=int,   default  = 10)
     parser.add_argument('--num_patch_aug', type=int,   default  = 1)
     parser.add_argument('--flip_aug',      type=str,   default  = 'False', choices=['True', 'False'])
+    parser.add_argument('--color_aug',     type=str,   default  = 'False', choices=['True', 'False'])
     parser.add_argument('--save_dir',    type = str,  required=True)
     parser.add_argument('--numof_points',type = int,  default=100000)
     parser.add_argument('--img_size',    type = int,  default=362)
@@ -71,8 +76,9 @@ if __name__ == "__main__":
        classesParams = json.load(fp)
     
     img_type        = args.img_type
-    img_type_binary = True  if args.img_type == 'binary' else False
-    flip_aug        = False if args.flip_aug == 'False'  else True
+    img_type_binary = True  if args.img_type == 'binary'  else False
+    flip_aug        = False if args.flip_aug == 'False'   else True
+    color_aug       = False if args.color_aug == 'False'  else True
     
     save_dir          = args.save_dir
     numofPoints       = args.numof_points
@@ -93,6 +99,7 @@ if __name__ == "__main__":
     instanceParamsDict['img_size']      = img_size
     instanceParamsDict['img_type']      = args.img_type
     instanceParamsDict['flip_aug']      = flip_aug
+    instanceParamsDict['color_aug']      = color_aug
     instanceParamsDict['instances']     = OrderedDict()
     
     os.makedirs(save_dir,   exist_ok=True)
@@ -127,7 +134,7 @@ if __name__ == "__main__":
     #クラス毎Fractalパラメータの読み出し
     systems_dict = classesParams['classes']
 
-    rots = [0, 2, 4]
+    rots = [0, 2, 4, 6]
     
     for cls, params in tqdm.tqdm(systems_dict.items()):
     
@@ -137,6 +144,11 @@ if __name__ == "__main__":
         spectral = params['spectral']
         
         samplePerturbIdcs = random.sample(perturbIdcs, k=num_perturbations)
+        
+        if color_aug:
+            h_base = random.randint(0,   H_BASE_MAX)
+            s_base = random.randint(77,  S_BASE_MAX)
+            v_base = random.randint(128, V_BASE_MAX)
         
         for p in range(num_perturbations):
            instanceName     = cls + '_' + ('%02d' % p)
@@ -148,7 +160,7 @@ if __name__ == "__main__":
                instanceSpectral       = np.array(spectalParam) + instancdePerturb
                sigMat                 = np.array([ [instanceSpectral[0], 0.0], [0.0, instanceSpectral[1]]])
                theta, phi, e, f       = instanceSpectral[2], instanceSpectral[3], instanceSpectral[4], instanceSpectral[5]
-               affine                 = getAffineSVD((theta * 2.0 * math.pi/360.0), (phi * 2.0 * math.pi/360.0), sigMat)
+               affine                 = getAffineSVD((theta * math.pi/180.0), (phi * math.pi/180.0), sigMat)
                a, b, c, d             = affine.transpose().ravel()
                fractalParams[i, 0, :] = [a, c, e]
                fractalParams[i, 1, :] = [b, d, f]
@@ -157,14 +169,25 @@ if __name__ == "__main__":
                perturbatedSpectral.append(instanceSpectral.tolist())
                
            #ifsから画像生成
-           points     = ifs.iterate(fractalParams, numofPoints, rng_list=rng.random(numofPoints), ps=None)
+           points = ifs.iterate(fractalParams, numofPoints, rng_list=rng.random(numofPoints), ps=None)
+           xyrange = ifs.minmax(points)
+           region = np.concatenate(xyrange)
            for rot in rots:
               strRot = ('%02d' % rot)
-              points = ifs.rotatePoints(points, (rot * 2.0 * math.pi/360.0))
-              gray_image = ifs.render(points, s=img_size, binary=True)
-              gray_image = ((gray_image/gray_image.max())*128).astype('uint8')
-              image      = ifs.colorize(gray_image)
-              #cv2.imwrite(os.path.join(savedir_cls, (instanceName + '_' + strRot +'.png')), gray_image)
+              points = ifs.rotatePoints(points, (rot * 2.0 * math.pi/360.0), xyrange)
+              gray_image = ifs.render(points, s=img_size, region=region, binary=True)
+              gray_image = (gray_image/gray_image.max()).astype('uint8')
+              if color_aug:
+                  h = h_base + random.randint(0, (255 - H_BASE_MAX))
+                  s = s_base + random.randint(0, (255 - S_BASE_MAX))
+                  v = v_base + random.randint(0, (255 - V_BASE_MAX))
+                  image = np.empty((img_size, img_size, 3), dtype=np.uint8)
+                  image[:, :, 0] = gray_image * h
+                  image[:, :, 1] = gray_image * s
+                  image[:, :, 2] = gray_image * v
+                  image = cv2.cvtColor(image, cv2.COLOR_HSV2BGR_FULL)
+              else:
+                  image = gray_image * 128
               cv2.imwrite(os.path.join(savedir_cls, (instanceName + '_' + strRot +'.png')), image)
            
            instanceParamsDict['instances'][instanceName]             = OrderedDict()

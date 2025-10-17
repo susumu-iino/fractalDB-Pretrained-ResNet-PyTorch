@@ -194,12 +194,22 @@ def iterate(sys, n_iter, rng_list, ps=None):
     return coords
 
 @numba.njit(cache=True)
-def rotatePoints(points, rot):
+def rotatePoints(points, rot, xyrange):
     coords = np.empty((len(points), 2))
+    mins, maxs = xyrange
+    xmin, ymin = mins
+    xmax, ymax = maxs
+    xoffset = (xmax + xmin)/2.0
+    yoffset = (ymax + ymin)/2.0
+    
     #rotMat = np.array([[math.cos(rot), -math.sin(rot)], [math.sin(rot), math.cos(rot)]])
     for i in range(len(points)):
-       coords[i, 0] = points[i, 0] * math.cos(rot) - points[i, 1] * math.sin(rot)
-       coords[i, 1] = points[i, 0] * math.sin(rot) + points[i, 1] * math.cos(rot)
+       x_shift = points[i, 0] - xoffset
+       y_shift = points[i, 1] - yoffset
+       coords[i, 0] = x_shift * math.cos(rot) - y_shift * math.sin(rot)
+       coords[i, 1] = x_shift * math.sin(rot) + y_shift * math.cos(rot)
+       coords[i, 0] = coords[i, 0] + xoffset
+       coords[i, 1] = coords[i, 1] + yoffset
     return coords
 
 
